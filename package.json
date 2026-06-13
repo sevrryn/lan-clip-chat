@@ -1,0 +1,46 @@
+{
+  "name": "lan-clip-chat",
+  "version": "1.0.0",
+  "description": "Portable LAN chat application with text, image, and file sharing",
+  "main": "./out/main/index.js",
+  "author": "",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "npm run build && electron-builder --win portable",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "electron-updater": "6.3.9",
+    "ws": "8.18.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/eslint-config-prettier": "2.0.0",
+    "@electron-toolkit/eslint-config-ts": "2.0.0",
+    "@electron-toolkit/preload": "3.0.1",
+    "@electron-toolkit/tsconfig": "1.0.1",
+    "@electron-toolkit/utils": "3.0.0",
+    "@types/jest": "29.5.14",
+    "@types/node": "22.13.10",
+    "@types/react": "18.3.18",
+    "@types/react-dom": "18.3.5",
+    "@types/ws": "8.5.14",
+    "@vitejs/plugin-react": "4.3.4",
+    "electron": "33.4.0",
+    "electron-builder": "25.1.8",
+    "electron-vite": "2.3.0",
+    "fast-check": "3.22.0",
+    "jest": "29.7.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "ts-jest": "29.2.5",
+    "ts-node": "10.9.2",
+    "typescript": "5.7.3",
+    "vite": "5.4.14"
+  }
+}

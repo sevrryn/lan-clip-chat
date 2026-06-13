@@ -1,0 +1,28 @@
+appId: com.lan-clip-chat.app
+productName: LAN Clip Chat
+
+directories:
+  output: dist
+
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  requestedExecutionLevel: asInvoker
+
+portable:
+  artifactName: LanClipChat.exe
+  unpackDirName: lan-clip-chat
+  useZip: false
+
+files:
+  - dist/main/**
+  - dist/preload/**
+  - dist/renderer/**
+  - node_modules/**
+  - package.json
+
+asar: true
+asarUnpack:
+  - node_modules/ws/**
