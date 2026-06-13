@@ -9,6 +9,7 @@
  *  - Expose `broadcast(msg, excludeId?)` and `send(socketId, msg)` helpers
  *  - Expose `start(): Promise<number>` and `stop(): Promise<void>`
  *  - Emit `connection` / `disconnection` events carrying the `socketId`
+ *  - Expose `disconnect(socketId, code?, reason?)` and `isAlive(socketId)` methods
  *
  * Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6
  */
@@ -25,7 +26,7 @@ import type { WsMessage } from '../shared/wsMessages'
 const PORT_MIN = 49152
 const PORT_MAX = 65535
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────[...]
 
 export type MessageHandler = (socketId: string, message: WsMessage) => void
 
@@ -33,7 +34,7 @@ interface TaggedSocket extends WebSocket {
   socketId: string
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────[...]
 
 /**
  * Finds a free TCP port within the ephemeral range by attempting a bind.
@@ -68,14 +69,14 @@ function findFreePort(maxAttempts = 20): Promise<number> {
   })
 }
 
-// ── WebSocketServer ───────────────────────────────────────────────────────────
+// ── WebSocketServer ────────────────────────────────────────────────────────[...]
 
 export class WebSocketServer extends EventEmitter {
   private wss: WsServer | null = null
   private sockets: Map<string, TaggedSocket> = new Map()
   private handlers: Map<string, MessageHandler> = new Map()
 
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  // ── Lifecycle ──────────────────────────────────────────────────────────[...]
 
   /**
    * Starts the WebSocket server on a random free port in 49152–65535.
@@ -163,7 +164,43 @@ export class WebSocketServer extends EventEmitter {
     socket.send(JSON.stringify(msg))
   }
 
-  // ── Internal ──────────────────────────────────────────────────────────────
+  /**
+   * Disconnects the socket identified by `socketId`.
+   * Does not expose internal socket Map; silently no-ops if not found.
+   *
+   * @param socketId The socket ID to disconnect
+   * @param code Optional WebSocket close code (default 1000)
+   * @param reason Optional close reason text
+   */
+  disconnect(socketId: string, code?: number, reason?: string): void {
+    const socket = this.sockets.get(socketId)
+    if (socket === undefined) return
+
+    const closeCode = code ?? 1000
+    const closeReason = reason ?? ''
+
+    try {
+      socket.close(closeCode, closeReason)
+    } catch (err) {
+      // Silently ignore if already closed or errored
+      console.warn(`[WebSocketServer] Error closing socket ${socketId}:`, err)
+    }
+  }
+
+  /**
+   * Check if a socket is alive and connected.
+   * Returns `true` if the socket exists and is in OPEN state; otherwise `false`.
+   *
+   * @param socketId The socket ID to check
+   * @returns `true` if connected, `false` otherwise
+   */
+  isAlive(socketId: string): boolean {
+    const socket = this.sockets.get(socketId)
+    if (socket === undefined) return false
+    return socket.readyState === WebSocket.OPEN
+  }
+
+  // ── Internal ──────────────────────────────────────────────────────────[...]
 
   private _attachConnectionHandler(): void {
     if (this.wss === null) return
