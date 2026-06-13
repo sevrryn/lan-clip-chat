@@ -3,13 +3,16 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { WebSocketServer } from './WebSocketServer'
 import { RoomManager } from './RoomManager'
+import { IpcBridge } from './IpcBridge'
 import { generateRoomCode } from './validation'
 
 let roomManager: RoomManager | null = null
 let wsServer: WebSocketServer | null = null
+let ipcBridge: IpcBridge | null = null
+let mainWindow: BrowserWindow | null = null
 
 function createWindow(): BrowserWindow {
-  const mainWindow = new BrowserWindow({
+  const window = new BrowserWindow({
     width: 1100,
     height: 750,
     show: false,
@@ -22,30 +25,30 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+  window.on('ready-to-show', () => {
+    window.show()
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
+  window.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
   // In development, load the Vite dev server; in production, load the built file.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    window.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    window.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  return mainWindow
+  return window
 }
 
 /**
- * Initialize WebSocketServer and RoomManager on app startup.
+ * Initialize WebSocketServer, RoomManager, and IpcBridge on app startup.
  * Creates a single room for testing.
  */
-async function initializeBackend(): Promise<void> {
+async function initializeBackend(window: BrowserWindow): Promise<void> {
   // Create WebSocket server
   wsServer = new WebSocketServer()
   const port = await wsServer.start()
@@ -58,6 +61,10 @@ async function initializeBackend(): Promise<void> {
 
   roomManager = new RoomManager(wsServer, roomCode, hostName, hostSocketId)
   console.log(`[main] RoomManager created with room code ${roomCode}`)
+
+  // Create IpcBridge to forward events to renderer
+  ipcBridge = new IpcBridge(roomManager, window)
+  console.log(`[main] IpcBridge connected`)
 
   // Log room state for debugging
   const state = roomManager.getState()
@@ -73,7 +80,7 @@ ipcMain.handle('createRoom', async () => {
   }
   const state = roomManager.getState()
   return {
-    roomCode: state.roomCode,
+    roomCode: state.roomCode
   }
 })
 
@@ -89,7 +96,7 @@ ipcMain.handle('getRoomState', async () => {
     roomCode: state.roomCode,
     hostName: state.hostName,
     participants: Array.from(state.participants.values()),
-    status: state.status,
+    status: state.status
   }
 })
 
@@ -102,17 +109,20 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Initialize backend (WebSocket + RoomManager)
+  // Create window first
+  mainWindow = createWindow()
+
+  // Initialize backend (WebSocket + RoomManager + IpcBridge)
   try {
-    await initializeBackend()
+    await initializeBackend(mainWindow)
   } catch (err) {
     console.error('[main] Failed to initialize backend:', err)
   }
 
-  createWindow()
-
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      mainWindow = createWindow()
+    }
   })
 })
 
@@ -124,6 +134,11 @@ app.on('window-all-closed', () => {
 
 // Clean up on exit
 app.on('before-quit', async () => {
+  // Dispose IPC bridge
+  if (ipcBridge) {
+    ipcBridge.dispose()
+  }
+
   // Stop WebSocket server
   if (wsServer) {
     try {
